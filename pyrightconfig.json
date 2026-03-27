@@ -1,0 +1,15 @@
+{
+  "pythonVersion": "3.14",
+  "pythonPlatform": "Windows",
+  "pythonPath": "C:/Users/kanbu/AppData/Local/Programs/Python/Python314/python.exe",
+  "venvPath": ".",
+  "typeCheckingMode": "basic",
+  "reportMissingModuleSource": "none",
+  "reportMissingImports": "warning",
+  "reportGeneralTypeIssues": "warning",
+  "exclude": [
+    "frontend/node_modules",
+    "**/__pycache__",
+    "**/.pytest_cache"
+  ]
+}

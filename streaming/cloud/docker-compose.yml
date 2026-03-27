@@ -1,0 +1,72 @@
+# ============================================================
+# Cloud Deployment — Energy Saver AI Streaming
+# AWS (MSK + IoT Core + SNS) & Azure (Event Hubs + IoT Hub)
+# ============================================================
+
+# ─── DOCKER COMPOSE (local dev / edge) ──────────────────────────
+version: "3.9"
+services:
+
+  # Kafka broker (use AWS MSK / Azure Event Hubs in production)
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: "energy-saver-cluster"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MQTT broker (use AWS IoT Core / Azure IoT Hub in production)
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    volumes:
+      - ./streaming/cloud/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+
+  # AI Streaming Pipeline
+  pipeline:
+    build:
+      context: .
+      dockerfile: streaming/cloud/Dockerfile
+    environment:
+      KAFKA_BROKERS:    "kafka:9092"
+      MQTT_BROKER:      "mosquitto"
+      MQTT_PORT:        "1883"
+      WS_PORT:          "8765"
+      ALERT_EMAIL:      "${ALERT_EMAIL}"
+      SLACK_WEBHOOK:    "${SLACK_WEBHOOK}"
+      SNS_TOPIC_ARN:    "${SNS_TOPIC_ARN}"
+      HA_URL:           "${HA_URL}"
+      HA_TOKEN:         "${HA_TOKEN}"
+      UTILITY_API_URL:  "${UTILITY_API_URL}"
+      AWS_REGION:       "${AWS_REGION:-us-east-1}"
+    depends_on:
+      kafka:     {condition: service_healthy}
+      mosquitto: {condition: service_started}
+    ports:
+      - "8765:8765"      # WebSocket dashboard
+    restart: unless-stopped
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+
+  # Dashboard web server
+  dashboard:
+    image: nginx:alpine
+    volumes:
+      - ./streaming/dashboard:/usr/share/nginx/html:ro
+    ports:
+      - "3000:80"
+    restart: unless-stopped

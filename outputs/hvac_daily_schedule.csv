@@ -1,0 +1,25 @@
+hour,occupied,occupancy_confidence,current_temp,target_temp,mode,tariff,reason,estimated_savings,forecast_kwh
+0,False,0%,19,26,ECO,$0.08/kWh,Room empty (confidence: 100%) → Energy saving mode,40%,0.5
+1,False,0%,19,26,ECO,$0.08/kWh,Room empty (confidence: 100%) → Energy saving mode,40%,0.5
+2,False,0%,19,26,ECO,$0.08/kWh,Room empty (confidence: 100%) → Energy saving mode,40%,0.5
+3,False,0%,19,26,ECO,$0.08/kWh,Room empty (confidence: 100%) → Energy saving mode,40%,0.5
+4,False,0%,19,26,ECO,$0.08/kWh,Room empty (confidence: 100%) → Energy saving mode,40%,0.5
+5,False,0%,19,26,ECO,$0.08/kWh,Room empty (confidence: 100%) → Energy saving mode,40%,0.93
+6,False,0%,19,26,ECO,$0.08/kWh,Room empty (confidence: 100%) → Energy saving mode,40%,2.11
+7,False,0%,19,26,ECO,$0.12/kWh,Room empty (confidence: 100%) → Energy saving mode,40%,3.2
+8,True,100%,21,22,PRE_CONDITION,$0.12/kWh,Morning pre-conditioning at off-peak rate,15%,2.88
+9,True,100%,21,22,COMFORT,$0.12/kWh,Normal occupied hours (tariff: $0.12/kWh),0%,3.83
+10,True,100%,21,22,COMFORT,$0.12/kWh,Normal occupied hours (tariff: $0.12/kWh),0%,4.07
+11,True,100%,23,22,COMFORT,$0.12/kWh,Normal occupied hours (tariff: $0.12/kWh),0%,4.73
+12,True,100%,23,22,COMFORT,$0.12/kWh,Normal occupied hours (tariff: $0.12/kWh),0%,4.38
+13,True,100%,23,22,COMFORT,$0.12/kWh,Normal occupied hours (tariff: $0.12/kWh),0%,4.69
+14,True,100%,23,22,COMFORT,$0.12/kWh,Normal occupied hours (tariff: $0.12/kWh),0%,4.46
+15,True,100%,24,22,COMFORT,$0.12/kWh,Normal occupied hours (tariff: $0.12/kWh),0%,3.41
+16,True,100%,24,22,COMFORT,$0.12/kWh,Normal occupied hours (tariff: $0.12/kWh),0%,3.55
+17,True,100%,24,22,COMFORT,$0.22/kWh,Normal occupied hours (tariff: $0.22/kWh),0%,3.11
+18,True,100%,24,22,COMFORT,$0.22/kWh,Normal occupied hours (tariff: $0.22/kWh),0%,2.25
+19,True,100%,23,22,COMFORT,$0.22/kWh,Normal occupied hours (tariff: $0.22/kWh),0%,0.76
+20,True,100%,23,22,COMFORT,$0.22/kWh,Normal occupied hours (tariff: $0.22/kWh),0%,0.59
+21,True,100%,22,22,COMFORT,$0.08/kWh,Normal occupied hours (tariff: $0.08/kWh),0%,0.5
+22,True,100%,22,22,COMFORT,$0.08/kWh,Normal occupied hours (tariff: $0.08/kWh),0%,0.5
+23,True,100%,22,22,COMFORT,$0.08/kWh,Normal occupied hours (tariff: $0.08/kWh),0%,0.5

@@ -1,0 +1,24 @@
+# ============================================================
+# Energy Saver AI -- Core Dependencies
+# ============================================================
+# Install:   pip install -r requirements.txt
+# Streaming: pip install -r requirements_streaming.txt
+# Dev:       pip install -r requirements_dev.txt
+
+# Deep learning
+tensorflow>=2.13.0,<2.16
+
+# Data science
+scikit-learn>=1.3.0,<2.0
+pandas>=2.0.0,<3.0
+numpy>=1.24.0,<2.0
+matplotlib>=3.7.0,<4.0
+
+# Persistence
+joblib>=1.3.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# Typing
+typing-extensions>=4.8.0

@@ -1,0 +1,28 @@
+# ============================================================
+# Energy Saver AI -- Streaming Dependencies
+# ============================================================
+# Install these in addition to requirements.txt when running
+# the live streaming pipeline.
+#
+# pip install -r requirements.txt -r requirements_streaming.txt
+
+# --- Core streaming ---
+aiokafka>=0.9.0
+asyncio-mqtt>=0.16.0
+websockets>=12.0
+aiohttp>=3.9.0
+
+# --- AWS (set CLOUD_PROVIDER=aws) ---
+boto3>=1.34.0
+aioboto3>=12.0.0
+
+# --- Azure (set CLOUD_PROVIDER=azure) ---
+azure-iot-hub>=2.6.0
+azure-eventhub>=5.11.0
+azure-storage-blob>=12.19.0
+
+# --- GCP (set CLOUD_PROVIDER=gcp) ---
+google-cloud-pubsub>=2.19.0
+google-cloud-storage>=2.14.0
+google-cloud-bigtable>=2.22.0
+google-cloud-aiplatform>=1.42.0

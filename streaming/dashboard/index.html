@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ Energy Saver AI — Live Dashboard</title>
+<style>
+  :root {
+    --navy:   #0A1628; --teal:  #0D9488; --teal-l: #14B8A6;
+    --white:  #FFFFFF; --slate: #475569; --bg:     #F1F5F9;
+    --green:  #10B981; --red:   #EF4444; --gold:   #F59E0B;
+    --purple: #8B5CF6; --blue:  #3B82F6; --orange: #F97316;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: #1E293B; }
+
+  /* Header */
+  header {
+    background: var(--navy); color: white; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  header h1 { font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #94A3B8; display: inline-block; }
+  .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  .header-right { display: flex; align-items: center; gap: 16px; font-size: 0.8rem; color: #94A3B8; }
+
+  /* Layout */
+  .container { padding: 20px; max-width: 1400px; margin: 0 auto; }
+
+  /* KPI Cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .kpi-card {
+    background: white; border-radius: 10px; padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-left: 4px solid var(--teal);
+    transition: transform 0.15s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); }
+  .kpi-card.anomaly  { border-left-color: var(--red); }
+  .kpi-card.solar    { border-left-color: var(--gold); }
+  .kpi-card.occupied { border-left-color: var(--blue); }
+  .kpi-card.hvac     { border-left-color: var(--orange); }
+  .kpi-card.forecast { border-left-color: var(--purple); }
+  .kpi-label { font-size: 0.72rem; text-transform: uppercase; color: var(--slate); letter-spacing: .06em; }
+  .kpi-value { font-size: 2rem; font-weight: 700; margin: 4px 0; line-height: 1; }
+  .kpi-sub   { font-size: 0.75rem; color: var(--slate); }
+  .kpi-value.red    { color: var(--red); }
+  .kpi-value.green  { color: var(--green); }
+  .kpi-value.gold   { color: var(--gold); }
+  .kpi-value.teal   { color: var(--teal); }
+  .kpi-value.purple { color: var(--purple); }
+
+  /* Main grid */
+  .main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+  /* Panels */
+  .panel {
+    background: white; border-radius: 10px; padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .panel-title {
+    font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+    color: var(--slate); letter-spacing: .08em; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* Live chart canvas */
+  canvas { width: 100% !important; }
+
+  /* HVAC status */
+  .hvac-mode {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+  }
+  .hvac-ECO             { background: #DCFCE7; color: #166534; }
+  .hvac-COMFORT         { background: #DBEAFE; color: #1E40AF; }
+  .hvac-DEMAND_RESPONSE { background: #FEE2E2; color: #991B1B; }
+  .hvac-PRE_CONDITION   { background: #FEF3C7; color: #92400E; }
+  .hvac-NIGHT_SETBACK   { background: #EDE9FE; color: #5B21B6; }
+  .hvac-detail { font-size: 0.78rem; color: var(--slate); margin-top: 6px; }
+
+  /* Alerts feed */
+  .alert-feed { max-height: 220px; overflow-y: auto; }
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid #F1F5F9; font-size: 0.8rem;
+  }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .alert-time { color: var(--slate); font-size: 0.72rem; }
+  .alert-msg  { color: #1E293B; }
+  .alert-score { font-size: 0.7rem; color: var(--red); font-weight: 600; }
+  .no-alerts  { color: var(--slate); font-size: 0.85rem; text-align: center; padding: 20px 0; }
+
+  /* Forecast bars */
+  .forecast-bars { display: flex; align-items: flex-end; gap: 3px; height: 80px; }
+  .forecast-bar {
+    flex: 1; background: var(--teal); border-radius: 3px 3px 0 0; opacity: 0.7;
+    transition: height 0.4s ease; min-height: 4px; cursor: pointer; position: relative;
+  }
+  .forecast-bar:hover { opacity: 1; }
+  .forecast-bar.peak  { background: var(--red); opacity: 0.8; }
+  .forecast-bar.solar { background: var(--gold); opacity: 0.8; }
+  .forecast-labels { display: flex; gap: 3px; margin-top: 4px; }
+  .forecast-labels span { flex: 1; font-size: 0.58rem; text-align: center; color: var(--slate); }
+
+  /* Stream fine-tune badge */
+  .ft-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #EDE9FE; color: #5B21B6; padding: 4px 10px;
+    border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+  }
+  .ft-badge.active { background: #DCFCE7; color: #166534; }
+
+  /* Bottom grid */
+  .bottom-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .bottom-grid { grid-template-columns: 1fr; } }
+
+  /* Model status table */
+  .model-table { width: 100%; font-size: 0.78rem; border-collapse: collapse; }
+  .model-table td { padding: 6px 4px; border-bottom: 1px solid #F1F5F9; }
+  .model-table tr:last-child td { border-bottom: none; }
+  .model-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot-green  { background: var(--green); }
+  .dot-gold   { background: var(--gold); }
+  .dot-slate  { background: var(--slate); }
+
+  /* Stream log */
+  .stream-log { font-family: 'Consolas', monospace; font-size: 0.72rem;
+    background: #0F172A; color: #7DD3FC; border-radius: 6px;
+    padding: 10px; max-height: 140px; overflow-y: auto; line-height: 1.6; }
+  .log-ts { color: #475569; }
+  .log-ok  { color: #34D399; }
+  .log-warn{ color: #F59E0B; }
+  .log-err { color: #F87171; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: #F1F5F9; }
+  ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>
+    <span>⚡</span>
+    Energy Saver AI — Live Dashboard
+  </h1>
+  <div class="header-right">
+    <span><span class="status-dot" id="statusDot"></span> <span id="statusText">Connecting…</span></span>
+    <span id="msgCount">0 msgs</span>
+    <span id="clockDisplay">--:--:--</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- KPI Row -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">⚡ Current Load</div>
+      <div class="kpi-value teal" id="kpiKwh">—</div>
+      <div class="kpi-sub">kWh this reading</div>
+    </div>
+    <div class="kpi-card anomaly">
+      <div class="kpi-label">🚨 Anomaly Score</div>
+      <div class="kpi-value" id="kpiAnomaly" style="color:var(--slate)">—</div>
+      <div class="kpi-sub" id="kpiAnomalyStatus">waiting…</div>
+    </div>
+    <div class="kpi-card solar">
+      <div class="kpi-label">☀️ Solar Output</div>
+      <div class="kpi-value gold" id="kpiSolar">—</div>
+      <div class="kpi-sub">kWh generating</div>
+    </div>
+    <div class="kpi-card occupied">
+      <div class="kpi-label">👤 Occupancy</div>
+      <div class="kpi-value" id="kpiOccupancy" style="color:var(--slate)">—</div>
+      <div class="kpi-sub" id="kpiOccupancySub">checking…</div>
+    </div>
+    <div class="kpi-card hvac">
+      <div class="kpi-label">🌡 Temperature</div>
+      <div class="kpi-value" id="kpiTemp" style="color:var(--orange)">—</div>
+      <div class="kpi-sub">°C current</div>
+    </div>
+    <div class="kpi-card forecast">
+      <div class="kpi-label">🔮 Next Hour</div>
+      <div class="kpi-value purple" id="kpiForecast">—</div>
+      <div class="kpi-sub">kWh forecast</div>
+    </div>
+  </div>
+
+  <!-- Main row -->
+  <div class="main-grid">
+
+    <!-- Live energy chart -->
+    <div class="panel">
+      <div class="panel-title">📈 Live Energy Consumption
+        <span id="ftBadge" class="ft-badge">🔁 Stream Fine-Tune: Idle</span>
+      </div>
+      <canvas id="energyChart" height="160"></canvas>
+    </div>
+
+    <!-- HVAC + Alerts -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="panel">
+        <div class="panel-title">❄️ HVAC Decision</div>
+        <div id="hvacMode" class="hvac-mode hvac-COMFORT">⏳ Loading…</div>
+        <div id="hvacDetail" class="hvac-detail">Waiting for first inference…</div>
+        <div style="margin-top:10px;font-size:0.75rem;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div>🌡 Target: <strong id="hvacTarget">—°C</strong></div>
+          <div>💨 Fan: <strong id="hvacFan">—</strong></div>
+          <div>💰 Tariff: <strong id="hvacTariff">—</strong></div>
+          <div>💚 Savings: <strong id="hvacSavings">—</strong></div>
+        </div>
+      </div>
+      <div class="panel" style="flex:1">
+        <div class="panel-title">🚨 Alert Feed</div>
+        <div class="alert-feed" id="alertFeed">
+          <div class="no-alerts">No alerts — system nominal ✅</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom row -->
+  <div class="bottom-grid">
+
+    <!-- 24h Forecast bars -->
+    <div class="panel">
+      <div class="panel-title">🔮 24-Hour Energy Forecast</div>
+      <div class="forecast-bars" id="forecastBars"></div>
+      <div class="forecast-labels" id="forecastLabels"></div>
+      <div style="margin-top:8px;font-size:0.72rem;color:var(--slate);display:flex;gap:12px">
+        <span><span style="color:var(--teal)">■</span> Normal</span>
+        <span><span style="color:var(--red)">■</span> Peak hour</span>
+        <span><span style="color:var(--gold)">■</span> Solar surplus</span>
+      </div>
+    </div>
+
+    <!-- Model status -->
+    <div class="panel">
+      <div class="panel-title">🧠 Model Status</div>
+      <table class="model-table" id="modelTable">
+        <tbody>
+          <tr><td><span class="model-dot dot-slate"></span>Forecasting (LSTM)</td><td id="m1">—</td></tr>
+          <tr><td><span class="model-dot dot-slate"></span>Anomaly (AE)</td><td id="m2">—</td></tr>
+          <tr><td><span class="model-dot dot-slate"></span>Occupancy (DNN)</td><td id="m3">—</td></tr>
+          <tr><td><span class="model-dot dot-slate"></span>HVAC (Rule+AI)</td><td id="m4">—</td></tr>
+          <tr><td><span class="model-dot dot-slate"></span>Solar (BiLSTM)</td><td id="m5">—</td></tr>
+          <tr><td><span class="model-dot dot-slate" id="ftDot"></span>Stream Fine-Tune</td><td id="m6">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Stream log -->
+    <div class="panel">
+      <div class="panel-title">📟 Stream Log</div>
+      <div class="stream-log" id="streamLog">
+        <div><span class="log-ts">[--:--:--]</span> Connecting to ws://localhost:8765…</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── STATE ──────────────────────────────────────────────────────
+const MAX_CHART_POINTS = 60;
+const chartData = { labels: [], values: [], anomaly: [] };
+let msgCount = 0, alertCount = 0;
+let ws = null, reconnectTimer = null;
+
+// ─── CLOCK ──────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById("clockDisplay").textContent =
+    new Date().toLocaleTimeString();
+}, 1000);
+
+// ─── WEBSOCKET ──────────────────────────────────────────────────
+function connect() {
+  const url = `ws://${location.hostname || 'localhost'}:8765`;
+  logStream(`Connecting to ${url}…`, "ts");
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    document.getElementById("statusDot").className  = "status-dot connected";
+    document.getElementById("statusText").textContent = "LIVE";
+    logStream("Connected ✓", "ok");
+    updateModelBadge("m1","✅ Active","green");
+    updateModelBadge("m2","✅ Active","green");
+    updateModelBadge("m3","✅ Active","green");
+    updateModelBadge("m4","✅ Active","green");
+    updateModelBadge("m5","✅ Active","green");
+    updateModelBadge("m6","⏳ Idle","gold");
+  };
+
+  ws.onmessage = (evt) => {
+    try {
+      const d = JSON.parse(evt.data);
+      msgCount++;
+      document.getElementById("msgCount").textContent = `${msgCount} msgs`;
+      handleMessage(d);
+    } catch(e) {}
+  };
+
+  ws.onclose = () => {
+    document.getElementById("statusDot").className  = "status-dot";
+    document.getElementById("statusText").textContent = "Reconnecting…";
+    logStream("Disconnected — retrying in 3s…", "warn");
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => logStream("WebSocket error", "err");
+}
+
+// ─── MESSAGE ROUTER ─────────────────────────────────────────────
+function handleMessage(d) {
+  if (d.type === "inference_result") updateInference(d);
+  else if (d.type === "alert")       handleAlert(d);
+  else if (d.type === "model_updated") handleModelUpdate(d);
+  else if (d.type === "context_update") {}
+}
+
+// ─── INFERENCE UPDATE ───────────────────────────────────────────
+function updateInference(d) {
+  const ts = new Date().toLocaleTimeString();
+
+  // KPIs
+  setText("kpiKwh",      (d.current_kwh || 0).toFixed(2));
+  setText("kpiTemp",     (d.current_temp || 0).toFixed(1));
+  setText("kpiForecast", (d.forecast_next_kwh || 0).toFixed(2));
+
+  // Anomaly
+  const score = d.anomaly_score || 0;
+  const anomEl = document.getElementById("kpiAnomaly");
+  anomEl.textContent = score.toFixed(3);
+  anomEl.style.color = score > 0.85 ? "var(--red)" : score > 0.6 ? "var(--gold)" : "var(--green)";
+  setText("kpiAnomalyStatus", score > 0.85 ? "⚠️ ANOMALY!" : score > 0.6 ? "Elevated" : "Normal ✓");
+
+  if (d.anomaly_detected) {
+    addAlert("🚨", `Anomaly detected! Score: ${score.toFixed(3)}`, ts, "error");
+    logStream(`ANOMALY score=${score.toFixed(3)} device=${d.device_id}`, "err");
+  }
+
+  // Occupancy
+  const oEl = document.getElementById("kpiOccupancy");
+  oEl.textContent = d.occupied ? "Occupied" : "Empty";
+  oEl.style.color = d.occupied ? "var(--blue)" : "var(--slate)";
+  setText("kpiOccupancySub", `Confidence: ${((d.occupancy_prob||0)*100).toFixed(0)}%`);
+
+  // HVAC
+  if (d.hvac) updateHVAC(d.hvac);
+
+  // Forecast bars
+  if (d.forecast_24h) updateForecastBars(d.forecast_24h);
+
+  // Chart
+  updateChart(ts, d.current_kwh || 0, d.anomaly_detected || false);
+
+  // Log
+  const flag = d.anomaly_detected ? "⚠️" : "✓";
+  logStream(`[${ts}] ${flag} ${(d.current_kwh||0).toFixed(2)}kWh | `+
+            `occ=${d.occupied?1:0} | hvac=${d.hvac?.mode||"?"} | `+
+            `score=${score.toFixed(3)}`, d.anomaly_detected ? "warn" : "ok");
+}
+
+// ─── HVAC ────────────────────────────────────────────────────────
+function updateHVAC(hvac) {
+  const el = document.getElementById("hvacMode");
+  const icons = {
+    ECO:"🌿", COMFORT:"😊", DEMAND_RESPONSE:"⚡",
+    PRE_CONDITION:"☀️", NIGHT_SETBACK:"🌙"
+  };
+  el.className = `hvac-mode hvac-${hvac.mode}`;
+  el.textContent = `${icons[hvac.mode]||"🏠"} ${hvac.mode.replace("_"," ")}`;
+  setText("hvacDetail",  hvac.reason || "");
+  setText("hvacTarget",  `${hvac.target_temp}°C`);
+  setText("hvacFan",     hvac.fan_speed || "auto");
+  setText("hvacTariff",  `$${(hvac.tariff||0).toFixed(2)}/kWh`);
+  setText("hvacSavings", hvac.savings_est || "—");
+}
+
+// ─── FORECAST BARS ───────────────────────────────────────────────
+function updateForecastBars(forecast) {
+  const barsEl   = document.getElementById("forecastBars");
+  const labelsEl = document.getElementById("forecastLabels");
+  if (!barsEl) return;
+
+  const now = new Date().getHours();
+  const max = Math.max(...forecast, 0.1);
+
+  barsEl.innerHTML   = "";
+  labelsEl.innerHTML = "";
+
+  forecast.forEach((v, i) => {
+    const h    = (now + i) % 24;
+    const pct  = Math.max(5, (v / max) * 100);
+    const isPeak = h >= 17 && h <= 20;
+
+    const bar = document.createElement("div");
+    bar.className = `forecast-bar${isPeak ? " peak" : ""}`;
+    bar.style.height = pct + "%";
+    bar.title = `${h}:00 — ${v.toFixed(2)} kWh`;
+    barsEl.appendChild(bar);
+
+    const lbl = document.createElement("span");
+    lbl.textContent = i % 4 === 0 ? `${h}h` : "";
+    labelsEl.appendChild(lbl);
+  });
+}
+
+// ─── CHART ───────────────────────────────────────────────────────
+let chartCanvas, chartCtx;
+window.addEventListener("load", () => {
+  chartCanvas = document.getElementById("energyChart");
+  chartCtx    = chartCanvas.getContext("2d");
+  drawChart();
+});
+
+function updateChart(label, value, isAnomaly) {
+  chartData.labels.push(label);
+  chartData.values.push(value);
+  chartData.anomaly.push(isAnomaly);
+  if (chartData.labels.length > MAX_CHART_POINTS) {
+    chartData.labels.shift(); chartData.values.shift(); chartData.anomaly.shift();
+  }
+  drawChart();
+}
+
+function drawChart() {
+  if (!chartCtx) return;
+  const W = chartCanvas.offsetWidth, H = 160;
+  chartCanvas.width  = W;
+  chartCanvas.height = H;
+  const ctx = chartCtx;
+  const data = chartData.values;
+  const n = data.length;
+  if (n < 2) return;
+
+  ctx.clearRect(0, 0, W, H);
+  const pad = { t:10, r:10, b:25, l:40 };
+  const cW = W - pad.l - pad.r;
+  const cH = H - pad.t - pad.b;
+  const maxV = Math.max(...data, 0.1);
+  const minV = Math.min(...data);
+
+  const xPos = i => pad.l + (i / (n - 1)) * cW;
+  const yPos = v => pad.t + cH - ((v - minV) / (maxV - minV + 0.001)) * cH;
+
+  // Grid lines
+  ctx.strokeStyle = "#E2E8F0"; ctx.lineWidth = 0.5;
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + (g / 4) * cH;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cW, y); ctx.stroke();
+    const val = maxV - (g / 4) * (maxV - minV);
+    ctx.fillStyle = "#94A3B8"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(val.toFixed(1), pad.l - 4, y + 3);
+  }
+
+  // Fill gradient
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + cH);
+  grad.addColorStop(0, "rgba(13,148,136,0.35)");
+  grad.addColorStop(1, "rgba(13,148,136,0.02)");
+  ctx.beginPath();
+  ctx.moveTo(xPos(0), yPos(data[0]));
+  for (let i = 1; i < n; i++) ctx.lineTo(xPos(i), yPos(data[i]));
+  ctx.lineTo(xPos(n-1), pad.t + cH); ctx.lineTo(xPos(0), pad.t + cH);
+  ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+  // Main line
+  ctx.beginPath(); ctx.strokeStyle = "#0D9488"; ctx.lineWidth = 2;
+  ctx.moveTo(xPos(0), yPos(data[0]));
+  for (let i = 1; i < n; i++) ctx.lineTo(xPos(i), yPos(data[i]));
+  ctx.stroke();
+
+  // Anomaly dots
+  data.forEach((v, i) => {
+    if (chartData.anomaly[i]) {
+      ctx.beginPath();
+      ctx.arc(xPos(i), yPos(v), 5, 0, 2*Math.PI);
+      ctx.fillStyle = "#EF4444"; ctx.fill();
+      ctx.strokeStyle = "white"; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  });
+
+  // Last value dot
+  if (n > 0) {
+    const lx = xPos(n-1), ly = yPos(data[n-1]);
+    ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 2*Math.PI);
+    ctx.fillStyle = "#0D9488"; ctx.fill();
+    ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
+// ─── ALERTS ──────────────────────────────────────────────────────
+function handleAlert(d) {
+  addAlert("🚨", d.message || d.alert_type, new Date().toLocaleTimeString(), "error");
+}
+
+function addAlert(icon, msg, ts, type) {
+  alertCount++;
+  const feed = document.getElementById("alertFeed");
+  const noAl = feed.querySelector(".no-alerts");
+  if (noAl) noAl.remove();
+
+  const div = document.createElement("div");
+  div.className = "alert-item";
+  div.innerHTML = `
+    <span class="alert-icon">${icon}</span>
+    <div>
+      <div class="alert-msg">${msg}</div>
+      <div class="alert-time">${ts}</div>
+    </div>`;
+  feed.insertBefore(div, feed.firstChild);
+  while (feed.children.length > 20) feed.removeChild(feed.lastChild);
+}
+
+// ─── MODEL UPDATE ────────────────────────────────────────────────
+function handleModelUpdate(d) {
+  const ts = new Date().toLocaleTimeString();
+  updateModelBadge("m6", "✅ Updated!", "green");
+  document.getElementById("ftDot").className = "model-dot dot-green";
+  document.getElementById("ftBadge").className = "ft-badge active";
+  document.getElementById("ftBadge").textContent = "🔁 Stream Fine-Tune: Updated!";
+  logStream(`MODEL UPDATE at ${ts}`, "ok");
+  addAlert("🧠", `Model hot-swapped via stream fine-tuning`, ts, "info");
+  setTimeout(() => {
+    document.getElementById("ftBadge").textContent = "🔁 Stream Fine-Tune: Active";
+  }, 5000);
+}
+
+// ─── STREAM LOG ─────────────────────────────────────────────────
+function logStream(msg, level="ts") {
+  const el = document.getElementById("streamLog");
+  const ts  = new Date().toLocaleTimeString();
+  const cls = { ts:"log-ts", ok:"log-ok", warn:"log-warn", err:"log-err" }[level] || "log-ts";
+  const div = document.createElement("div");
+  div.innerHTML = `<span class="log-ts">[${ts}]</span> <span class="${cls}">${msg}</span>`;
+  el.insertBefore(div, el.firstChild);
+  while (el.children.length > 50) el.removeChild(el.lastChild);
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+function updateModelBadge(id, text, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = color === "green" ? "var(--green)" :
+                   color === "gold"  ? "var(--gold)"  : "var(--slate)";
+}
+
+// Demo mode if no WebSocket
+function startDemoMode() {
+  logStream("WebSocket unavailable — running demo simulation", "warn");
+  document.getElementById("statusText").textContent = "DEMO";
+  document.getElementById("statusDot").className = "status-dot connected";
+  let step = 0;
+  const HOURS = [0.5,0.5,0.4,0.4,0.5,0.8,1.5,2.2,1.8,1.5,1.6,1.7,1.5,1.4,1.5,1.8,2.5,3.2,3.5,3.0,2.5,2.0,1.5,1.0];
+  setInterval(() => {
+    const now  = new Date();
+    const hour = now.getHours();
+    const base = HOURS[hour];
+    const kwh  = Math.max(0.1, base + (Math.random() - 0.5) * 0.3 + (Math.random()<0.01 ? 3.5 : 0));
+    const anomScore = Math.random() < 0.02 ? Math.random() * 0.3 + 0.75 : Math.random() * 0.25;
+    const occ  = hour >= 7 && hour <= 22;
+    const forecast = Array.from({length:24}, (_,i) => Math.max(0.1, HOURS[(hour+i)%24] + (Math.random()-0.5)*0.2));
+    handleMessage({
+      type: "inference_result", current_kwh: kwh, current_temp: 20+5*Math.sin(hour*Math.PI/12),
+      anomaly_score: anomScore, anomaly_detected: anomScore > 0.85,
+      occupied: occ, occupancy_prob: occ ? 0.85 : 0.1,
+      forecast_next_kwh: forecast[0], forecast_24h: forecast,
+      hvac: { mode: !occ ? "ECO" : hour>=17&&hour<=20 ? "DEMAND_RESPONSE" : "COMFORT",
+              target_temp: !occ ? 17 : 22, fan_speed: "auto",
+              tariff: hour>=17&&hour<=20 ? 0.22 : 0.13, savings_est: !occ ? "40%" : "0%",
+              reason: !occ ? "Room empty" : "Normal occupied" },
+      device_id: "demo_device"
+    });
+    step++;
+  }, 1500);
+}
+
+// Start
+setTimeout(() => {
+  connect();
+  setTimeout(() => { if (!ws || ws.readyState !== 1) startDemoMode(); }, 3000);
+}, 500);
+</script>
+</body>
+</html>
