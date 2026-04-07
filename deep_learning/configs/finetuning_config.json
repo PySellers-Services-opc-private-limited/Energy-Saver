@@ -1,0 +1,118 @@
+{
+  "backbone": {
+    "input_shape": [48, 6],
+    "cnn_filters": [32, 64, 128],
+    "lstm_units": 128,
+    "attention_dim": 64,
+    "dropout_rate": 0.2
+  },
+
+  "pretraining": {
+    "n_samples": 5000,
+    "seq_len": 48,
+    "n_features": 6,
+    "mask_ratio": 0.15,
+    "epochs": 30,
+    "batch_size": 64,
+    "learning_rate": 0.001
+  },
+
+  "fine_tuning": {
+    "strategies": {
+      "feature_extraction": {
+        "description": "Freeze backbone, train task head only. Fast, good for very small datasets.",
+        "freeze_group": 0,
+        "learning_rate": 0.001,
+        "epochs": 20,
+        "best_for": ["small_dataset (<500 samples)", "quick_experiment"]
+      },
+      "progressive": {
+        "description": "Gradually unfreeze layers from top to bottom across 3 phases.",
+        "phases": [
+          {"name": "Phase 1 - Frozen",    "freeze_group": 0, "epochs": 5,  "lr": 5e-4},
+          {"name": "Phase 2 - LSTM+Attn", "freeze_group": 2, "epochs": 20, "lr": 1e-4},
+          {"name": "Phase 3 - Full",      "freeze_group": 3, "epochs": 15, "lr": 5e-5}
+        ],
+        "best_for": ["medium_dataset (500-5000 samples)", "standard_fine_tuning"]
+      },
+      "full_finetune": {
+        "description": "All layers trainable with warmup + cosine LR decay.",
+        "freeze_group": 3,
+        "learning_rate": 2e-4,
+        "warmup_epochs": 5,
+        "min_lr": 1e-7,
+        "epochs": 40,
+        "best_for": ["large_dataset (>5000 samples)", "maximum_accuracy"]
+      }
+    },
+
+    "differential_lr_multipliers": {
+      "task_head":         1.0,
+      "attention":         0.2,
+      "bilstm":            0.04,
+      "tcn_block_2":       0.008,
+      "tcn_block_1":       0.0016,
+      "tcn_block_0":       0.0003,
+      "input_projection":  0.0001
+    },
+
+    "tasks": {
+      "forecasting": {
+        "output_units": 24,
+        "loss": "mse",
+        "metrics": ["mae"],
+        "recommended_strategy": "progressive",
+        "input_window": 48,
+        "n_features": 6
+      },
+      "anomaly": {
+        "output_units": 1,
+        "loss": "binary_crossentropy",
+        "metrics": ["accuracy", "auc"],
+        "recommended_strategy": "feature_extraction",
+        "input_window": 24,
+        "n_features": 1
+      },
+      "occupancy": {
+        "output_units": 1,
+        "loss": "binary_crossentropy",
+        "metrics": ["accuracy"],
+        "recommended_strategy": "progressive",
+        "input_window": 12,
+        "n_features": 8,
+        "class_weight": "balanced"
+      },
+      "solar": {
+        "output_units": 24,
+        "loss": "mse",
+        "metrics": ["mae"],
+        "recommended_strategy": "progressive",
+        "input_window": 48,
+        "n_features": 10
+      },
+      "bill": {
+        "output_units": 1,
+        "loss": "mse",
+        "metrics": ["mae"],
+        "recommended_strategy": "full_finetune",
+        "input_window": 1,
+        "n_features": 11
+      }
+    }
+  },
+
+  "callbacks": {
+    "early_stopping": {"patience": 7, "restore_best_weights": true},
+    "reduce_lr":      {"factor": 0.5, "patience": 4, "min_lr": 1e-8},
+    "gradient_monitor": {"log_every": 5, "alert_threshold": 10.0},
+    "overfit_detector": {"gap_threshold": 0.25, "patience": 3},
+    "warm_restart_lr":  {"max_lr": 1e-3, "min_lr": 1e-7, "cycle_epochs": 10, "cycle_mult": 2.0}
+  },
+
+  "layer_groups": {
+    "group_0": {"description": "Freeze ALL — pure feature extraction",   "layers": ["all"]},
+    "group_1": {"description": "Freeze input + TCN block 0",             "layers": ["input_proj", "tcn_block_0"]},
+    "group_2": {"description": "Freeze input + TCN blocks 0 & 1",        "layers": ["input_proj", "tcn_block_0", "tcn_block_1"]},
+    "group_3": {"description": "Unfreeze ALL — full fine-tuning",        "layers": []}
+  }
+}

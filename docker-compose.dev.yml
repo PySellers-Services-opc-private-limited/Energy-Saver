@@ -1,0 +1,115 @@
+# ============================================================
+# Energy Saver AI — Local Development docker-compose
+# ============================================================
+# Starts: Kafka (KRaft), Mosquitto MQTT, Kafka UI, and the
+#         AI streaming pipeline in simulate mode.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml down -v
+
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────
+# Shared defaults
+# ─────────────────────────────────────────────────────────────
+x-common-logging: &logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# ─────────────────────────────────────────────────────────────
+# Services
+# ─────────────────────────────────────────────────────────────
+services:
+
+  # ── Kafka (KRaft mode, no ZooKeeper) ─────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: energy-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "energy-saver-dev"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    logging: *logging
+
+  # ── Kafka UI (browse topics and messages) ────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.1
+    container_name: energy-kafka-ui
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "8080:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    logging: *logging
+
+  # ── MQTT Broker (Mosquitto) ───────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: energy-mqtt
+    volumes:
+      - ./streaming/cloud/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "1883:1883"
+      - "9001:9001"    # WebSocket MQTT
+    logging: *logging
+
+  # ── AI Streaming Pipeline ─────────────────────────────────
+  pipeline:
+    build:
+      context: .
+      dockerfile: streaming/cloud/Dockerfile
+    container_name: energy-pipeline
+    environment:
+      CLOUD_PROVIDER:   gcp
+      KAFKA_BROKERS:    kafka:9092
+      MQTT_BROKER:      mosquitto
+      MQTT_PORT:        "1883"
+      WS_PORT:          "8765"
+      LOG_LEVEL:        INFO
+      ALERT_EMAIL:      "${ALERT_EMAIL:-}"
+      SLACK_WEBHOOK:    "${SLACK_WEBHOOK:-}"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    ports:
+      - "8765:8765"   # WebSocket → browser dashboard
+    restart: unless-stopped
+    volumes:
+      - ./ml_models:/app/ml_models
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+    logging: *logging
+
+  # ── Dashboard (nginx) ─────────────────────────────────────
+  dashboard:
+    image: nginx:1.25-alpine
+    container_name: energy-dashboard
+    volumes:
+      - ./streaming/dashboard:/usr/share/nginx/html:ro
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    logging: *logging

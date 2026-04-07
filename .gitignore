@@ -1,0 +1,97 @@
+# ============================================================
+# Energy Saver AI — .gitignore
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+lib/
+lib64/
+*.egg-link
+.installed.cfg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env
+.ENV
+
+# --- Secrets & config (never commit) ---
+.env
+.env.*
+!.env.example
+secrets.json
+service-account-key.json
+*.pem
+*.key
+*.crt
+credentials.json
+
+# --- IDE & editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- ML artefacts ---
+ml_models/*.keras
+ml_models/*.h5
+ml_models/*.weights.h5
+ml_models/pretrained/
+ml_models/finetuned/
+outputs/
+*.pkl
+*.joblib
+
+# --- Data (generated / large files) ---
+data/*.csv
+data/*.parquet
+data/*.h5
+!data/generate_data.py
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+*.ipynb
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Database ---
+*.db
+
+# --- Logs ---
+logs/
+*.log
+*.log
+
+# --- Docker ---
+.docker/
+
+# --- Terraform / Infrastructure ---
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# --- OS ---
+*.DS_Store
+desktop.ini

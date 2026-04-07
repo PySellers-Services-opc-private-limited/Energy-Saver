@@ -1,0 +1,116 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────────────────────────
+# GCP LOCAL EMULATOR STACK
+# Mirrors Cloud Run + Pub/Sub + Bigtable locally for dev/testing.
+#
+# In production, swap these for real GCP managed services:
+#   pubsub-emulator  → Cloud Pub/Sub
+#   bigtable-emulator → Cloud Bigtable
+#   pipeline          → Cloud Run
+#   dashboard         → Cloud CDN + Cloud Run
+# ──────────────────────────────────────────────────────────────────
+
+services:
+
+  # Google Cloud Pub/Sub emulator
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085
+    ports:
+      - "8085:8085"
+    environment:
+      PUBSUB_EMULATOR_HOST: "0.0.0.0:8085"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085"]
+      interval: 10s
+      retries: 5
+
+  # Pub/Sub topic setup (runs once)
+  pubsub-setup:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    depends_on:
+      pubsub-emulator:
+        condition: service_healthy
+    environment:
+      PUBSUB_EMULATOR_HOST: "pubsub-emulator:8085"
+      CLOUDSDK_CORE_PROJECT: "energy-saver-local"
+    entrypoint: /bin/bash
+    command: |
+      -c "
+      gcloud config set project energy-saver-local
+      gcloud pubsub topics create energy-sensors-raw    --project=energy-saver-local
+      gcloud pubsub topics create energy-alerts         --project=energy-saver-local
+      gcloud pubsub topics create energy-hvac-commands  --project=energy-saver-local
+      gcloud pubsub topics create energy-model-updates  --project=energy-saver-local
+      gcloud pubsub subscriptions create energy-pipeline-sub \
+        --topic=energy-sensors-raw --project=energy-saver-local
+      echo 'Pub/Sub topics created!'
+      "
+    restart: "no"
+
+  # Cloud Bigtable emulator
+  bigtable-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud beta emulators bigtable start --host-port=0.0.0.0:8086
+    ports:
+      - "8086:8086"
+    environment:
+      BIGTABLE_EMULATOR_HOST: "0.0.0.0:8086"
+
+  # AI Streaming Pipeline (Cloud Run equivalent)
+  pipeline:
+    build:
+      context: ../..
+      dockerfile: streaming/cloud/Dockerfile
+    environment:
+      CLOUD_PROVIDER:            "gcp"
+      GCP_PROJECT_ID:            "${GCP_PROJECT_ID:-energy-saver-local}"
+      GCP_REGION:                "${GCP_REGION:-us-central1}"
+      GCP_PUBSUB_TOPIC:          "energy-sensors-raw"
+      GCP_PUBSUB_SUB:            "energy-pipeline-sub"
+      GCP_GCS_BUCKET:            "${GCP_GCS_BUCKET:-energy-saver-ai}"
+      GCP_BIGTABLE_INSTANCE:     "energy-data"
+      PUBSUB_EMULATOR_HOST:      "pubsub-emulator:8085"
+      BIGTABLE_EMULATOR_HOST:    "bigtable-emulator:8086"
+      WS_PORT:                   "8765"
+      LOG_LEVEL:                 "INFO"
+      SLACK_WEBHOOK:             "${SLACK_WEBHOOK:-}"
+      GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-}"
+    depends_on:
+      - pubsub-emulator
+      - bigtable-emulator
+    ports:
+      - "8765:8765"
+    volumes:
+      - ../../models:/app/models
+      - ../../data:/app/data
+      - ../../outputs:/app/outputs
+    restart: unless-stopped
+    command: ["python", "main.py", "stream", "--live"]
+
+  # Dashboard (nginx serving static files)
+  dashboard:
+    image: nginx:alpine
+    volumes:
+      - ../dashboard:/usr/share/nginx/html:ro
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+  # GCS emulator (MinIO — S3/GCS compatible)
+  gcs-emulator:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER:     "minioadmin"
+      MINIO_ROOT_PASSWORD: "minioadmin"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - gcs_data:/data
+    restart: unless-stopped
+
+volumes:
+  gcs_data:
